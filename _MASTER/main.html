@@ -1,0 +1,611 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <link rel="stylesheet" type="text/css" href="GotStyle/FUP.css"/>
+        <title>Understanding Permissions</title>
+    </head>
+    <body>
+        <div id="fb-root"></div>
+        <script type="text/javascript">
+            // Strip stuff out when construction scope string
+            String.prototype.rtrim = function() {
+            return this.replace(/,*$/g, "")
+            }
+
+            function process(key,value, level) {
+                if(typeof(value) == "object")
+                {
+                    if(isNaN(key)) {
+                        document.getElementById('results').innerHTML += "<h" + level + ">"+ toTitleCase(key) + "<h" + level +  "/>";
+                    }
+                }
+                else if(value != "" && value != null && value != undefined && key != "id" && key != "updated_time" && key != "link" && key != "verified")
+                {
+                    console.log(key, value)
+                    document.getElementById('results').innerHTML += toTitleCase(key) + " : "+value + "<br/>";
+                }
+            }
+            
+            function toTitleCase(str)
+            {
+                return str.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+            }
+            function traverse(o,func, level) {
+                if(!level) {
+                    level = 1;
+                }
+                for (i in o) {
+                    func.apply(this,[i,o[i], level]);  
+                    if (typeof(o[i])=="object") {
+                        //going on step down in the object tree!!
+                        traverse(o[i],func, level+1);
+                    }
+                }
+            }
+    
+            function buildScope()
+			{
+				with (document.forms){
+					var scope = "";
+					
+					//if drop down boxes are NOT selected
+					if (frmPermissions.cboPopularAuth.value != "void" && frmPermissions.cboPopularApp.value != "void"){
+						alert("Please select only one drop down box application for review of permissions");
+						  
+					}else if (frmPermissions.cboPopularApp.value == "void" && frmPermissions.cboPopularAuth.value == "void"){		
+						//setting permission scope from check boxes	
+						var scope = "";
+						for(var i=0; i<document.frmPermissions.elements.length; i++){
+							if (document.frmPermissions.elements[i].type === "checkbox" && document.frmPermissions.elements[i].checked === true)
+							{
+								scope += document.frmPermissions.elements[i].id + ",";
+							}
+						}						  
+						scope = scope.rtrim();
+						
+					} else if (frmPermissions.cboPopularApp.value != "void"){
+						if (frmPermissions.cboPopularApp.value == "Bejeweled"){
+							scope = "email";
+						} else if (frmPermissions.cboPopularApp.value == "EmbeePay"){
+							scope = "";
+						} else if (frmPermissions.cboPopularApp.value == "FarmVille"){
+							scope = "";
+						} else if (frmPermissions.cboPopularApp.value == "People_Roulette"){
+							scope = "user_birthday, user_online_presence, xmpp_login, publish_stream";
+						} else if (frmPermissions.cboPopularApp.value == "Washington_Post_Social_Reader"){
+							scope = "";
+						} else if (frmPermissions.cboPopularApp.value == "Words_With_Friend"){
+							scope = "user_about_me, user_likes";
+						}
+						
+					} else if (frmPermissions.cboPopularAuth.value != "void"){
+						if (frmPermissions.cboPopularAuth.value == "Pandora"){
+							scope = "";
+						} else if (frmPermissions.cboPopularAuth.value == "Skype"){
+							scope = "";
+						} else if (frmPermissions.cboPopularAuth.value == "Spotify"){
+							scope = "user_birthday, email";
+						}					
+					}
+				}
+				return scope;
+			}
+
+            var button;
+            var userInfo;
+            
+            window.fbAsyncInit = function() {
+                FB.init({ appId: '230656070352154', 
+                    status: true, 
+                    cookie: true,
+                    xfbml: true,
+                    oauth: true});
+
+               showLoader(true);
+               
+               function updateButton(response) {
+                    button       =   document.getElementById('submit_button');
+                    userInfo     =   document.getElementById('user-info');
+                    if (response.authResponse) {
+                        //user is already logged in and connected
+                        FB.api('/me', function(info) {
+                            login(response, info);
+                        });
+                        
+                        button.onclick = function() {
+                        FB.api({ method: 'Auth.revokeAuthorization' }, function(response) {
+                              clearDisplay();
+                            });
+                        };
+                    } else {
+                        //user is not connected to your app or logged out
+                         button.value = 'Login';
+                        button.onclick = function() {
+                            showLoader(true);
+                            FB.login(function(response) {
+                                if (response.authResponse) {
+                                    FB.api('/me', function(info) {
+                                        login(response, info);
+                                    });    
+                                } else {
+                                    //user cancelled login or did not grant authorization
+                                    showLoader(true);
+                                }
+                            }, {scope:buildScope()});   
+                        }
+                    }
+              }
+              
+            function clearDisplay() {
+				userInfo.innerHTML                             =   "";
+				document.getElementById('debug').innerHTML     =   "";
+				document.getElementById('other').style.display =   "none";
+				document.getElementById('user_results').style.display =   "none";
+				document.getElementById('table_user_buttons').style.borderBottom = "#666666 thin solid";
+				document.getElementById('user-info').style.display =   "none";
+				document.getElementById('user_options').style.display = "block";
+				showLoader(true);
+				self.location = "main.html";
+        	}
+               
+                // run once with current status and whenever the status changes
+                FB.getLoginStatus(updateButton);
+                FB.Event.subscribe('auth.statusChange', updateButton);  
+            };
+            (function() {
+                var e = document.createElement('script'); e.async = true;
+                e.src = document.location.protocol 
+                    + '//connect.facebook.net/en_US/all.js';
+                document.getElementById('fb-root').appendChild(e);
+            }());
+            
+            
+            function login(response, info){
+                if (response.authResponse) {
+                    var accessToken         =   response.authResponse.accessToken;
+                    
+                    userInfo.innerHTML      = info.name + ', here is the permission example you requested; click "Disconnect" to perform another request <br> or "Log Off Facebook" to remove Understanding Permissions app and log off Facebook altogether.';
+                                        
+                    button.value            = 'Disconnect';
+                    fqlQuery();
+                    showLoader(false);
+                    document.getElementById('other').style.display = "block";
+                    document.getElementById('user_results').style.display = "block";
+                    document.getElementById('user_options').style.display = "none";
+                    document.getElementById('table_user_buttons').style.borderBottom = "none";
+                }
+            }
+        
+            function logout(response){
+                userInfo.innerHTML                             =   "";
+                document.getElementById('debug').innerHTML     =   "";
+                document.getElementById('other').style.display =   "none";
+                document.getElementById('user_results').style.display =   "none";
+                document.getElementById('user_options').style.display = "block";
+                document.getElementById('table_user_buttons').style.borderBottom = "#000 thin solid";
+                showLoader(false);
+                FB.api({ method: 'Auth.revokeAuthorization' }, function(response) {
+                }); 
+                FB.logout(function(response) {
+                    clearDisplay();
+                });
+                self.location="index.html";
+            }
+
+            function fqlQuery(){
+
+                FB.api('/me', function(response) {
+                    document.getElementById('results').innerHTML = "";
+                    traverse(response,process);
+                });
+            }
+            
+            function showLoader(status){
+                if (status)
+                    document.getElementById('loader').style.display = 'block';
+                else
+                    document.getElementById('loader').style.display = 'none';
+            }
+            
+        </script>
+           
+        <div id="page_holder" class="pageholder">
+        <form method="post" name="frmPermissions">
+            <div id="other" style="display:none"></div>
+            <div id="debug"></div>
+            <center>
+            <div id="heading" class="div_header">
+                <center>
+                    <table style="width:100%; height:40px; color:#fff; background-color:#903; border-left:#000 thin solid; border-right:#000 thin solid; border-top:#000 thin solid;">
+                        <tr>
+                            <td align="left">
+                                SMALL BANNER
+                            </td>
+                            <td align="right">
+                                Facebook Permission Utility
+                            </td>
+                        </tr>
+                    </table>
+                    <table style="width:100%; height:100px; background-color:#fff; border-left:#000 thin solid; border-right:#000 thin solid;">
+                        <tr>
+                            <td style="color:#000;">
+                                <div id="loader" style="display:none; font-family:Arial, Helvetica, sans-serif; font-size:10pt; line-height:12pt;">
+                                    Welcome to the Facebook Permission Utility. 
+                                    <font style="line-height:8pt"><br /><br /></font>
+                                    This application allows you to see how your Facebook information is shared with third party vendors of applications
+                                    based on the permissions granted during installation. You must select the permissions you would like to investigate and select login granting this application
+                                    with the appopriate permissions.  You will be presented with a graphical illustration of your Facebook information after accepting permissions through the 
+                                    Facebook dialog.
+                                    <font style="line-height:8pt"><br /><br /></font>
+                                    This application <b>does not retain, store or share </b>any of your information and is provided strictly for education puposes.  <b>Enjoy.</b>
+                                </div>
+                                <div id="user-info" style="vertical-align:top; width:100%; text-align:center">
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </center>
+            </div>
+            
+            <div id="user_options" class="div_options">
+                <center>
+                    <table style="width:100%; height:100%; background-color:#FFF; border-left:#000 thin solid; border-right:#000 thin solid;">
+                        <tr>
+                            <td align="center">
+                                <!-- Popular App Combo Boxes ---->
+                                <table class="tb_user_options">
+                                    <tr>
+                                        <td align="center">
+                                            <h1 style="font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:14px; font-weight:bold;">Popular Application Preset Permissions</h1>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td align="center">
+                                            <table width="730px">
+                                                <tr>
+                                                    <td align="center" valign="middle" width="50%">
+                                                        <select name="cboPopularApp" style="width:70%;font-family:Arial, Helvetica, sans-serif; font-size:12px;">
+                                                            <option value="void">Facebook Platform Applications</option>
+                                                            <option value="Bejeweled">Bejeweled</option>
+                                                            <option value="EmbeePay">EmbeePay</option>
+                                                            <option value="FarmVille">FarmVille</option>
+                                                            <option value="People_Roulette">People Roulette</option>
+                                                            <option value="Washington_Post_Social_Reader">Washington Post Social Reader </option>
+                                                            <option value="Words_With_Friend">Words with Friends</option>
+                                                        </select>
+                                                    </td>
+                                                    <td align="center" valign="middle" width="50%">
+                                                        <select name="cboPopularAuth" style="width:70%;font-family:Arial, Helvetica, sans-serif; font-size:12px;">
+                                                            <option value="void">Facebook Authenticated Applications</option>
+                                                            <option value="Pandora">Pandora</option>
+                                                            <option value="Skype">Skype</option>
+                                                            <option value="Spotify">Spotify</option>
+                                                        </select>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td width="100%">
+                                <table width="100%" border="0" class="tb_user_options">
+                                    <tr>
+                                        <td width="32%" align="center" style="border-bottom:#000 thin solid;">
+                                            <h1 style="font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:14px; font-weight:bold;">User Permissions</h1>
+                                        </td>
+                                        <td width="2%" style="border-left:#000 thin solid; border-bottom:#000 thin solid;">
+                                            <br />
+                                        </td>
+                                        <td width="32%" align="center" style="border-bottom:#000 thin solid;">
+                                            <h1 style="font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:14px; font-weight:bold;">Friend Permissions</h1>
+                                        </td>
+                                        <td width="2%" style="border-left:#000 thin solid; border-bottom:#000 thin solid;">
+                                            <br />
+                                        </td>
+                                        <td width="32%" align="center" style="border-bottom:#000 thin solid;">
+                                            <h1 style="font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:14px; font-weight:bold;">Extended Permissions</h1>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td align="center">
+                                            <!-- User Permissions ---->
+                                            <table width="100%" border="0">
+                                                <tr>
+                                                    <td align="left">
+                                                        <input type="checkbox" id="user_about_me" name="chkUser_about_me"/> About me
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_activities" name="chkUser_activities"/> Activities
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_birthday" name="chkUser_birthday"/> Birthday
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_checkins" name="chkUser_checkins"/> Checkins
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_education_history" name="chkUser_education_history"/> Education history
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_events" name="chkUser_events"/> Events
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="email" name="chkUser_email"/> Email
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_groups" name="chkUser_groups"/> Groups
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_hometown" name="chkUser_hometown"/> Hometown
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_interests" name="chkUser_interests"/> Interests
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_likes" name="chkUser_likes"/> Likes
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_location" name="chkUser_location"/> Location
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_notes" name="chkUser_notes"/> Notes
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_photos" name="chkUser_photos"/> Photos
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_questions" name="chkUser_questions"/> Questions
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_relationships" name="chkUser_relationships"/> Relationships
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_relationship_details" name="chkUser_relationship_details"/> Relationship <font style="line-height:9px;"><br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Details</font>
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_religion_politics" name="chkUser_religion_politics"/>Religion <font style="line-height:9px;"><br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Politics</font>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                     <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_status" name="chkUser_status"/> Status
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_videos" name="chkUser_videos"/> Videos
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_website" name="chkUser_website"/> Website
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_work_history" name="chkUser_work_history"/> Work history
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td style="border-left:#000 thin solid;">
+                                            <!-- SPACER !--><br />
+                                        </td>
+                                        <td align="center">
+                                            <!-- Friend Permissions !-->
+                                            <table width="100%" border="0">
+                                                <tr>
+                                                    <td align="left">
+                                                        <input type="checkbox" id="friends_about_me" name="chkFriend_about_me"/> About me
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_activities" name="chkFriend_activities"/> Activities
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_birthday" name="chkFriend_birthday"/> Birthday
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_checkins" name="chkFriend_checkins"/> Checkins
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_education_history" name="chkFriend_education_history"/> Education History
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_events" name="chkFriend_events"/> Events
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_groups" name="chkFriend_groups"/> Groups
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_hometown" name="chkFriend_hometown"/> Hometown
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_interests" name="chkFriend_interests"/> Interests
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_likes" name="chkFriend_likes"/> Likes
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_location" name="chkFriend_location"/> Location
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_notes" name="chkFriend_notes"/> Notes
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_photos" name="chkFriend_photos"/> Photos
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_questions" name="chkFriend_questions"/> Questions
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_relationships" name="chkFriend_relationships"/> Religion <font style="line-height:9px;"><br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Politics</font>
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_relationship_details" name="chkFriend_relationship_details"/> Relationship <font style="line-height:9px;"><br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Details</font>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_religion_politics" name="chkFriend_religion_politics"/>Relationships
+                                                    </td>
+                                                     <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_status" name="chkFriend_status"/> Status
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_videos" name="chkFriend_videos"/> Videos
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_website" name="chkFriend_website"/> Website
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_work_history" name="chkFriend_work_history"/> Work History
+                                                    </td>
+                                                    <td>
+                                                        <br />
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                        <td style="border-left:#000 thin solid;">
+                                            <!-- SPACER !--><br />
+                                        </td>
+                                        <td valign="top">
+                                            <!-- Extended Permissions !-->
+                                            <table width="100%" border="0">
+                                            	<tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="rsvp_event" name="chkExtend_rsvp_event"/> RSVP Event
+                                                    </td>
+                                                	<td align="left" valign="middle">
+                                                        <input type="checkbox" id="" name="chkExtend_xmpp_login"/> XMPP Login
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="offline_access" name="chkExtend_offline_access"/> Offline Access
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="manage_friendlists" name="chkExtend_manage_friendlists"/>Manage Friendlists
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                	<td align="left" valign="middle">
+                                                        <input type="checkbox" id="publish_stream" name="chkExtend_publish_stream"/> Publish Stream
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="publish_actions" name="chkExtend_publish_actions"/> Publish Actions
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                	<td align="left" valign="middle">
+                                                        <input type="checkbox" id="read_friendlists" name="chkExtend_read_friendlists"/> Read Friendlists
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="read_insights" name="chkExtend_read_insights"/> Read Insights
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="read_mailbox" name="chkExtend_read_mailbox"/> Read Mailbox
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="read_requests" name="chkExtend_read_requests"/> Read Requests
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="read_stream" name="chkExtend_read_stream"/> Read Stream
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="create_event" name="chkExtend_create_event"/> Create Event
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="ads_management" name="chkExtend_ads_management"/> Ads <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Management
+                                                    </td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="manage_notifications" name="chkExtend_manage_notifications"/> Manage <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Notifications
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="user_online_presence" name="chkUser_online_presence" /> User Online <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Presence
+                                 					</td>
+                                                    <td align="left" valign="middle">
+                                                        <input type="checkbox" id="friends_online_presence" name="chkFriends_online_presence" /> Friends Online <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Presence
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </center>
+            </div>
+            
+            <div id="user_buttons" class="div_buttons">
+                <center>
+                    <table id="table_user_buttons" style="width:100%; margin:0; background-color:#FFF; border-left:#000 thin solid; border-right:#000 thin solid; border-bottom:#000 thin solid;">
+                        <tr>
+                            <td align="center">
+                                <input type="button" value="Request Permissions" id="submit_button"/>
+                                <input type="button" id="log_off" value="Log Off Facebook" onclick="logout(response)"/>
+                            </td>
+                        </tr>
+                    </table>
+                </center>
+            </div>
+            
+            <div id="user_results" style="display:none;" class="div_buttons">
+                <table style="width:100%; background-color:#FFF; border-left:#000 thin solid; border-right:#000 thin solid; border-bottom:#000 thin solid; margin:0px">
+                    <tr>
+                        <td align="center">
+                            <h1>Results</h1>
+                            <div id="results" style="text-align:left;padding:10px;color:#000;">
+                            </div>      
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            </center>
+        </form>
+        </div>
+    </body>
+</html>

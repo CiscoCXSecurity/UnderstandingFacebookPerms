@@ -1,0 +1,22 @@
+/* CSS Document */
+
+body {
+	font-family:Tahoma, Geneva, sans-serif;
+	font-size:10pt;
+	color:#000;
+	background-color:#CCC;
+}
+
+.pageholder {
+	width:100%;
+	text-align:center;
+	margin:0;
+}
+
+.div_container {
+	width:760px;
+	overflow:hidden;
+	text-align:center;
+	border:none;
+	margin:0;
+}
